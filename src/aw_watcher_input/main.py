@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import aw_client
 import click
@@ -40,7 +40,7 @@ def _log_file_path() -> Path:
 
 def _configure_logging(debug: bool) -> None:
     level = logging.DEBUG if debug else logging.INFO
-    handlers = [logging.StreamHandler(), logging.FileHandler(_log_file_path(), encoding="utf-8")]
+    handlers: List[logging.Handler] = [logging.StreamHandler(), logging.FileHandler(_log_file_path(), encoding="utf-8")]
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
