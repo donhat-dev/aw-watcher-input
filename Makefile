@@ -1,7 +1,7 @@
 .PHONY: build test package clean
 
 PYTHON ?= python
-POETRY ?= $(PYTHON) -m poetry
+POETRY ?= poetry
 PYINSTALLER ?= $(PYTHON) -m PyInstaller
 
 build:
