@@ -1,0 +1,15 @@
+[watcher]
+poll_time = 5
+
+[odoo]
+enabled = false
+base_url = "http://localhost:8069"
+token = ""
+api_secret = ""
+sign_requests = true
+employee_id = 0
+device_id = ""
+device_name = ""
+timeout_secs = 10
+push_metadata_events = true
+push_screenshots = false
