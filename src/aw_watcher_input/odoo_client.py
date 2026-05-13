@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class OdooPushConfig:
     enabled: bool = False
     base_url: str = "http://localhost:8069"
+    pin_code: str = ""
     token: str = ""
     api_secret: str = ""
     sign_requests: bool = True
@@ -46,12 +47,12 @@ class OdooActivityTrackingClient:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.config.enabled and self.config.token)
+        return bool(self.config.enabled and (self.config.token or self.config.pin_code or self.config.employee_id))
 
     def start(self) -> None:
         if not self.enabled:
-            if self.config.enabled and not self.config.token and not self._warned_disabled:
-                logger.warning("Odoo push is enabled but token is empty; skipping Odoo sync")
+            if self.config.enabled and not (self.config.token or self.config.pin_code or self.config.employee_id) and not self._warned_disabled:
+                logger.warning("Odoo push is enabled without token, pin_code, or employee_id; skipping Odoo sync")
                 self._warned_disabled = True
         return
 
@@ -118,7 +119,10 @@ class OdooActivityTrackingClient:
         if not self.enabled:
             return None
         body = dict(payload)
-        body["token"] = self.config.token
+        if self.config.pin_code:
+            body["pin_code"] = self.config.pin_code
+        if self.config.token:
+            body["token"] = self.config.token
         if self.config.employee_id:
             body["employee_id"] = self.config.employee_id
         if self.config.sign_requests and self.config.api_secret:

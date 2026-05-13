@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import aw_client
 import click
+from aw_client.odoo_config import apply_global_odoo_config
 from aw_core import Event
 
 try:
@@ -31,9 +32,41 @@ if KeyboardListener is None or MouseListener is None:
 logger = logging.getLogger(__name__)
 
 
+def _macos_input_permission_hint() -> str:
+    return (
+        "On macOS, input capture requires Accessibility/Input Monitoring permission "
+        "for ActivityWatch or the bundled aw-watcher-input helper."
+    )
+
+
+def _refresh_odoo_client(
+    odoo_config: OdooPushConfig,
+    client: aw_client.ActivityWatchClient,
+    odoo_client: OdooActivityTrackingClient,
+) -> OdooActivityTrackingClient:
+    changed = apply_global_odoo_config(
+        odoo_config,
+        client,
+        logger=logger,
+        source="aw-watcher-input",
+    )
+    if not changed:
+        return odoo_client
+    odoo_client.stop()
+    refreshed = OdooActivityTrackingClient(odoo_config, agent_version="aw-watcher-input/0.1.0")
+    refreshed.start()
+    return refreshed
+
+
 def _log_file_path() -> Path:
     from aw_core.dirs import get_log_dir
-    log_dir = Path(get_log_dir("aw-watcher-input"))
+    env_log_dir = os.getenv("AW_LOG_DIR")
+    if env_log_dir:
+        log_dir = Path(env_log_dir).expanduser()
+    elif os.getenv("AW_LOG_ROOT"):
+        log_dir = Path(os.environ["AW_LOG_ROOT"]).expanduser() / "aw-watcher-input"
+    else:
+        log_dir = Path(get_log_dir("aw-watcher-input"))
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "aw-watcher-input.log"
 
@@ -85,6 +118,8 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     logger.debug("Frozen executable: %s", getattr(sys, "frozen", False))
     logger.debug("Current working directory: %s", os.getcwd())
     logger.debug("Log file: %s", _log_file_path())
+    if sys.platform == "darwin":
+        logger.info(_macos_input_permission_hint())
 
     if IMPORT_ERROR:
         logger.exception("Dependency import failed: %s", IMPORT_ERROR)
@@ -96,6 +131,7 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     client.wait_for_start()
     logger.info("Connecting to aw-server")
     client.connect()
+    odoo_client = _refresh_odoo_client(odoo_config, client, odoo_client)
 
     # Create bucket
     bucket_name = "{}_{}".format(client.client_name, client.client_hostname)
@@ -107,10 +143,20 @@ def main(testing: bool, debug: bool, config: Optional[str]):
 
     logger.info("Starting keyboard listener")
     keyboard = KeyboardListener()
-    keyboard.start()
+    try:
+        keyboard.start()
+    except Exception as exc:
+        if sys.platform == "darwin":
+            logger.exception("Failed to start keyboard listener. %s", _macos_input_permission_hint())
+        raise RuntimeError("Failed to start keyboard listener") from exc
     logger.info("Starting mouse listener")
     mouse = MouseListener()
-    mouse.start()
+    try:
+        mouse.start()
+    except Exception as exc:
+        if sys.platform == "darwin":
+            logger.exception("Failed to start mouse listener. %s", _macos_input_permission_hint())
+        raise RuntimeError("Failed to start mouse listener") from exc
 
     now = datetime.now(tz=timezone.utc)
     logger.info("Watcher loop started with poll_time=%s", poll_time)
@@ -125,6 +171,7 @@ def main(testing: bool, debug: bool, config: Optional[str]):
         sleep(time_to_sleep)
 
         now = datetime.now(tz=timezone.utc)
+        odoo_client = _refresh_odoo_client(odoo_config, client, odoo_client)
 
         # If input:    Send a heartbeat with data, ensure the span is correctly set, and don't use pulsetime.
         # If no input: Send a heartbeat with all-zeroes in the data, use a pulsetime.
