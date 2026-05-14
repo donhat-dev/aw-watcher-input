@@ -30,7 +30,7 @@ class OdooPushConfig:
     device_id: str = ""
     device_name: str = ""
     timeout_secs: float = 10.0
-    push_metadata_events: bool = True
+    push_metadata_events: bool = False
     push_screenshots: bool = False
 
 

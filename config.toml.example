@@ -11,5 +11,6 @@ employee_id = 0
 device_id = ""
 device_name = ""
 timeout_secs = 10
-push_metadata_events = true
+# aw-odoo-sync owns bucket-event sync in bundled ActivityWatch builds.
+push_metadata_events = false
 push_screenshots = false

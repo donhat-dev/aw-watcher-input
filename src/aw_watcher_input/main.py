@@ -8,15 +8,12 @@ from typing import Any, Dict, List, Optional
 
 import aw_client
 import click
-from aw_client.odoo_config import apply_global_odoo_config
 from aw_core import Event
 
 try:
     import tomllib  # type: ignore[attr-defined]
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
-
-from .odoo_client import OdooActivityTrackingClient, OdooPushConfig
 
 try:
     from aw_watcher_afk.listeners import KeyboardListener, MouseListener
@@ -37,25 +34,6 @@ def _macos_input_permission_hint() -> str:
         "On macOS, input capture requires Accessibility/Input Monitoring permission "
         "for ActivityWatch or the bundled aw-watcher-input helper."
     )
-
-
-def _refresh_odoo_client(
-    odoo_config: OdooPushConfig,
-    client: aw_client.ActivityWatchClient,
-    odoo_client: OdooActivityTrackingClient,
-) -> OdooActivityTrackingClient:
-    changed = apply_global_odoo_config(
-        odoo_config,
-        client,
-        logger=logger,
-        source="aw-watcher-input",
-    )
-    if not changed:
-        return odoo_client
-    odoo_client.stop()
-    refreshed = OdooActivityTrackingClient(odoo_config, agent_version="aw-watcher-input/0.1.0")
-    refreshed.start()
-    return refreshed
 
 
 def _log_file_path() -> Path:
@@ -111,8 +89,6 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     _configure_logging(debug)
     raw_config = _load_toml_config(config)
     watcher_config = raw_config.get("watcher", {})
-    odoo_config = OdooPushConfig(**raw_config.get("odoo", {}))
-    odoo_client = OdooActivityTrackingClient(odoo_config, agent_version="aw-watcher-input/0.1.0")
     logger.info("Starting watcher-input")
     logger.debug("Python executable: %s", sys.executable)
     logger.debug("Frozen executable: %s", getattr(sys, "frozen", False))
@@ -131,7 +107,6 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     client.wait_for_start()
     logger.info("Connecting to aw-server")
     client.connect()
-    odoo_client = _refresh_odoo_client(odoo_config, client, odoo_client)
 
     # Create bucket
     bucket_name = "{}_{}".format(client.client_name, client.client_hostname)
@@ -139,7 +114,6 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     logger.info("Creating bucket %s of type %s", bucket_name, eventtype)
     client.create_bucket(bucket_name, eventtype, queued=False)
     poll_time = watcher_config.get("poll_time", 5)
-    odoo_client.start()
 
     logger.info("Starting keyboard listener")
     keyboard = KeyboardListener()
@@ -171,7 +145,6 @@ def main(testing: bool, debug: bool, config: Optional[str]):
         sleep(time_to_sleep)
 
         now = datetime.now(tz=timezone.utc)
-        odoo_client = _refresh_odoo_client(odoo_config, client, odoo_client)
 
         # If input:    Send a heartbeat with data, ensure the span is correctly set, and don't use pulsetime.
         # If no input: Send a heartbeat with all-zeroes in the data, use a pulsetime.
@@ -192,18 +165,3 @@ def main(testing: bool, debug: bool, config: Optional[str]):
 
         logger.debug("Sending heartbeat to bucket=%s pulsetime=%s data=%s", bucket_name, pulsetime, merged_data)
         client.heartbeat(bucket_name, e, pulsetime=pulsetime, queued=True)
-        odoo_client.push_bucket_events(
-            bucket_name,
-            eventtype,
-            [
-                {
-                    "id": f"{bucket_name}-{int(last_run.timestamp() * 1000)}",
-                    "timestamp": last_run.isoformat(),
-                    "duration": (now - last_run).total_seconds(),
-                    "data": {
-                        "bucket": bucket_name,
-                        **merged_data,
-                    },
-                }
-            ]
-        )
