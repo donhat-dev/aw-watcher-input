@@ -9,6 +9,7 @@ a = Analysis(['src/aw_watcher_input/__main__.py'],
              binaries=None,
              datas=None,
              hiddenimports=[
+                'aw_watcher_afk.listeners',
                 'Xlib.keysymdef.miscellany',
                 'Xlib.keysymdef.latin1',
                 'Xlib.keysymdef.latin2',

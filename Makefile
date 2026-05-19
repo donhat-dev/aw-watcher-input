@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 POETRY ?= poetry
-PYINSTALLER ?= $(PYTHON) -m PyInstaller
+PYINSTALLER ?= $(POETRY) run python -m PyInstaller
 
 build:
 	$(POETRY) install
