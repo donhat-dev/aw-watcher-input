@@ -21,7 +21,7 @@ build-vis:
 package:
 	$(PYINSTALLER) aw-watcher-input.spec --clean --noconfirm
 ifeq ($(OS),Windows_NT)
-	powershell -NoProfile -ExecutionPolicy Bypass -Command "$$target = 'dist/aw-watcher-input'; if ((Test-Path $$target) -and -not (Test-Path $$target -PathType Container)) { Move-Item $$target ($$target + '.bin') -Force; New-Item -ItemType Directory -Force $$target | Out-Null; Move-Item ($$target + '.bin') (Join-Path $$target 'aw-watcher-input') -Force } else { New-Item -ItemType Directory -Force $$target | Out-Null }; if (Test-Path 'config.toml.example') { Copy-Item 'config.toml.example' 'dist/aw-watcher-input/config.toml.example' -Force }; if (Test-Path 'visualization/dist') { New-Item -ItemType Directory -Force 'dist/visualization' | Out-Null; Copy-Item 'visualization/dist/*' 'dist/visualization' -Recurse -Force }"
+	powershell -NoProfile -ExecutionPolicy Bypass -Command '$$target = "dist/aw-watcher-input"; if ((Test-Path $$target) -and -not (Test-Path $$target -PathType Container)) { Move-Item $$target ($$target + ".bin") -Force; New-Item -ItemType Directory -Force $$target | Out-Null; Move-Item ($$target + ".bin") (Join-Path $$target "aw-watcher-input") -Force } else { New-Item -ItemType Directory -Force $$target | Out-Null }; if (Test-Path "config.toml.example") { Copy-Item "config.toml.example" "dist/aw-watcher-input/config.toml.example" -Force }; if (Test-Path "visualization/dist") { New-Item -ItemType Directory -Force "dist/visualization" | Out-Null; Copy-Item "visualization/dist/*" "dist/visualization" -Recurse -Force }'
 else
 	if [ -f "dist/aw-watcher-input" ]; then \
 		mv dist/aw-watcher-input dist/aw-watcher-input.bin; \
