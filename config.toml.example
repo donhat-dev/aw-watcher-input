@@ -1,16 +1,2 @@
 [watcher]
 poll_time = 5
-
-[odoo]
-enabled = false
-base_url = "http://localhost:8069"
-token = ""
-api_secret = ""
-sign_requests = true
-employee_id = 0
-device_id = ""
-device_name = ""
-timeout_secs = 10
-# aw-odoo-sync owns bucket-event sync in bundled ActivityWatch builds.
-push_metadata_events = false
-push_screenshots = false
