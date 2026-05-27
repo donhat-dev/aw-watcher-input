@@ -10,23 +10,13 @@ import aw_client
 import click
 from aw_core import Event
 
+from .listeners import KeyboardListener, MouseListener
 from .macos_permissions import ensure_macos_input_permissions
 
 try:
     import tomllib  # type: ignore[attr-defined]
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
-
-try:
-    from aw_watcher_afk.listeners import KeyboardListener, MouseListener
-except Exception:  # pragma: no cover
-    KeyboardListener = None  # type: ignore[assignment]
-    MouseListener = None  # type: ignore[assignment]
-else:
-    IMPORT_ERROR = None
-
-if KeyboardListener is None or MouseListener is None:
-    IMPORT_ERROR = "Failed to import aw_watcher_afk.listeners"
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +88,13 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     logger.debug("Log file: %s", _log_file_path())
     if sys.platform == "darwin":
         logger.info(_macos_input_permission_hint())
-        ensure_macos_input_permissions(log=logger)
-
-    if IMPORT_ERROR:
-        logger.exception("Dependency import failed: %s", IMPORT_ERROR)
-        raise RuntimeError(IMPORT_ERROR)
+        permission_state = ensure_macos_input_permissions(log=logger)
+        if not permission_state.satisfied:
+            logger.warning(
+                "macOS input permission is still missing; exiting watcher-input without error. "
+                "Grant Input Monitoring/Accessibility permission, then quit and restart ActivityWatch."
+            )
+            return
 
     client = aw_client.ActivityWatchClient("aw-watcher-input", testing=testing)
     logger.debug("Created ActivityWatchClient host=%s port=%s testing=%s", getattr(client, "host", None), getattr(client, "port", None), testing)
