@@ -14,15 +14,13 @@ _ACCESS_GRANTED = 0
 @dataclass(frozen=True)
 class MacosInputPermissionState:
     listen_event: Optional[bool]
-    accessibility: Optional[bool]
+    screen_recording: Optional[bool]
     satisfied: bool
 
 
 class CtypesMacosPermissionBackend:
     def __init__(self):
         self.core_graphics = _load_framework("CoreGraphics")
-        self.core_foundation = _load_framework("CoreFoundation")
-        self.application_services = _load_framework("ApplicationServices")
         self.io_kit = _load_framework("IOKit")
 
     def has_listen_event_access(self) -> Optional[bool]:
@@ -39,28 +37,19 @@ class CtypesMacosPermissionBackend:
             return bool(request())
         return self._iohid_request_access()
 
-    def has_accessibility_trust(self) -> Optional[bool]:
-        trusted = getattr(self.application_services, "AXIsProcessTrusted", None)
-        if trusted is None:
+    def has_screen_recording_access(self) -> Optional[bool]:
+        preflight = getattr(self.core_graphics, "CGPreflightScreenCaptureAccess", None)
+        if preflight is None:
             return None
-        trusted.restype = ctypes.c_bool
-        return bool(trusted())
+        preflight.restype = ctypes.c_bool
+        return bool(preflight())
 
-    def request_accessibility_trust(self) -> Optional[bool]:
-        request = getattr(self.application_services, "AXIsProcessTrustedWithOptions", None)
+    def request_screen_recording_access(self) -> Optional[bool]:
+        request = getattr(self.core_graphics, "CGRequestScreenCaptureAccess", None)
         if request is None:
             return None
-
-        options = self._accessibility_prompt_options()
-        if not options:
-            return None
-
-        request.argtypes = [ctypes.c_void_p]
         request.restype = ctypes.c_bool
-        try:
-            return bool(request(options))
-        finally:
-            self._cf_release(options)
+        return bool(request())
 
     def _iohid_check_access(self) -> Optional[bool]:
         check = getattr(self.io_kit, "IOHIDCheckAccess", None)
@@ -78,39 +67,6 @@ class CtypesMacosPermissionBackend:
         request.restype = ctypes.c_bool
         return bool(request(_REQUEST_TYPE_LISTEN_EVENT))
 
-    def _accessibility_prompt_options(self) -> Optional[int]:
-        try:
-            prompt_key = ctypes.c_void_p.in_dll(
-                self.application_services,
-                "kAXTrustedCheckOptionPrompt",
-            )
-            cf_true = ctypes.c_void_p.in_dll(self.core_foundation, "kCFBooleanTrue")
-        except ValueError:
-            return None
-
-        dictionary_create = self.core_foundation.CFDictionaryCreate
-        dictionary_create.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_void_p),
-            ctypes.POINTER(ctypes.c_void_p),
-            ctypes.c_long,
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-        ]
-        dictionary_create.restype = ctypes.c_void_p
-
-        keys = (ctypes.c_void_p * 1)(prompt_key.value)
-        values = (ctypes.c_void_p * 1)(cf_true.value)
-        return dictionary_create(None, keys, values, 1, None, None)
-
-    def _cf_release(self, ref: int) -> None:
-        release = getattr(self.core_foundation, "CFRelease", None)
-        if release is None:
-            return
-        release.argtypes = [ctypes.c_void_p]
-        release.restype = None
-        release(ref)
-
 
 def ensure_macos_input_permissions(
     platform: str = sys.platform,
@@ -121,7 +77,7 @@ def ensure_macos_input_permissions(
         log.info("macOS input permission step skipped: platform=%s", platform)
         return MacosInputPermissionState(
             listen_event=True,
-            accessibility=True,
+            screen_recording=True,
             satisfied=True,
         )
 
@@ -132,57 +88,59 @@ def ensure_macos_input_permissions(
             log.info("macOS input permission backend unavailable: %s", exc)
             return MacosInputPermissionState(
                 listen_event=None,
-                accessibility=None,
+                screen_recording=None,
                 satisfied=False,
             )
 
-    log.info("macOS input permission preflight: checking ListenEvent and Accessibility")
+    log.info("macOS input permission preflight: checking Input Monitoring and Screen Recording")
     state = _read_state(backend, log)
     if state.satisfied:
         log.info(
-            "macOS input permission already satisfied: listen_event=%s accessibility=%s",
+            "macOS input permission already satisfied: listen_event=%s screen_recording=%s",
             state.listen_event,
-            state.accessibility,
+            state.screen_recording,
         )
         return state
 
-    log.info("macOS input permission missing; requesting Input Monitoring prompt")
-    listen_result = _call_backend(
-        "request_listen_event_access",
-        backend.request_listen_event_access,
-        log,
-    )
-    log.info("macOS Input Monitoring request returned: %s", listen_result)
+    if state.listen_event is not True:
+        log.info("macOS input permission missing; requesting Input Monitoring prompt")
+        listen_result = _call_backend(
+            "request_listen_event_access",
+            backend.request_listen_event_access,
+            log,
+        )
+        log.info("macOS Input Monitoring request returned: %s", listen_result)
 
     state = _read_state(backend, log)
     if state.satisfied:
         log.info(
-            "macOS input permission satisfied after Input Monitoring request: listen_event=%s accessibility=%s",
+            "macOS input permission satisfied after Input Monitoring request: listen_event=%s screen_recording=%s",
             state.listen_event,
-            state.accessibility,
+            state.screen_recording,
         )
         return state
 
-    log.info("macOS input permission still missing; requesting Accessibility prompt")
-    accessibility_result = _call_backend(
-        "request_accessibility_trust",
-        backend.request_accessibility_trust,
-        log,
-    )
-    log.info("macOS Accessibility request returned: %s", accessibility_result)
+    if state.screen_recording is not True:
+        log.info("macOS screen recording permission missing; requesting Screen Recording prompt")
+        screen_result = _call_backend(
+            "request_screen_recording_access",
+            backend.request_screen_recording_access,
+            log,
+        )
+        log.info("macOS Screen Recording request returned: %s", screen_result)
 
     state = _read_state(backend, log)
     if state.satisfied:
         log.info(
-            "macOS input permission satisfied after Accessibility request: listen_event=%s accessibility=%s",
+            "macOS input permission satisfied after Screen Recording request: listen_event=%s screen_recording=%s",
             state.listen_event,
-            state.accessibility,
+            state.screen_recording,
         )
     else:
         log.info(
-            "macOS input permission still missing after prompt requests: listen_event=%s accessibility=%s",
+            "macOS input permission still missing after prompt requests: listen_event=%s screen_recording=%s",
             state.listen_event,
-            state.accessibility,
+            state.screen_recording,
         )
     return state
 
@@ -193,21 +151,21 @@ def _read_state(backend, log: logging.Logger) -> MacosInputPermissionState:
         backend.has_listen_event_access,
         log,
     )
-    accessibility = _call_backend(
-        "has_accessibility_trust",
-        backend.has_accessibility_trust,
+    screen_recording = _call_backend(
+        "has_screen_recording_access",
+        backend.has_screen_recording_access,
         log,
     )
-    satisfied = listen_event is True or accessibility is True
+    satisfied = listen_event is True and screen_recording is True
     log.info(
-        "macOS input permission state: listen_event=%s accessibility=%s satisfied=%s",
+        "macOS input permission state: listen_event=%s screen_recording=%s satisfied=%s",
         listen_event,
-        accessibility,
+        screen_recording,
         satisfied,
     )
     return MacosInputPermissionState(
         listen_event=listen_event,
-        accessibility=accessibility,
+        screen_recording=screen_recording,
         satisfied=satisfied,
     )
 

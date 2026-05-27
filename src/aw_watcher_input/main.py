@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 def _macos_input_permission_hint() -> str:
     return (
-        "On macOS, input capture requires Accessibility/Input Monitoring permission "
-        "for ActivityWatch or the bundled aw-watcher-input helper."
+        "On macOS, ActivityWatch requires Input Monitoring and Screen Recording permissions. "
+        "If macOS does not reopen the app after Quit & Reopen, open ActivityWatch manually."
     )
 
 
@@ -92,7 +92,7 @@ def main(testing: bool, debug: bool, config: Optional[str]):
         if not permission_state.satisfied:
             logger.warning(
                 "macOS input permission is still missing; exiting watcher-input without error. "
-                "Grant Input Monitoring/Accessibility permission, then quit and restart ActivityWatch."
+                "Grant Input Monitoring and Screen Recording permissions, then quit and reopen ActivityWatch manually if needed."
             )
             return
 
