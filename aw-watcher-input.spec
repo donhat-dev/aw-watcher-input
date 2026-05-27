@@ -1,31 +1,42 @@
 # -*- mode: python -*-
 
+import platform
+
 block_cipher = None
 
 name = "aw-watcher-input"
-hiddenimports = [
-    'Xlib.keysymdef.miscellany',
-    'Xlib.keysymdef.latin1',
-    'Xlib.keysymdef.latin2',
-    'Xlib.keysymdef.latin3',
-    'Xlib.keysymdef.latin4',
-    'Xlib.keysymdef.greek',
-    'Xlib.support.unix_connect',
-    'Xlib.ext.shape',
-    'Xlib.ext.xinerama',
-    'Xlib.ext.composite',
-    'Xlib.ext.randr',
-    'Xlib.ext.xfixes',
-    'Xlib.ext.security',
-    'Xlib.ext.xinput',
-    'pynput.keyboard._xorg',
-    'pynput.mouse._xorg',
-    'pynput.keyboard._win32',
-    'pynput.mouse._win32',
-    'pynput.keyboard._darwin',
-    'pynput.mouse._darwin',
-    'win32timezone',
-]
+hiddenimports = []
+
+target = platform.system()
+if target == 'Linux':
+    hiddenimports += [
+        'Xlib.keysymdef.miscellany',
+        'Xlib.keysymdef.latin1',
+        'Xlib.keysymdef.latin2',
+        'Xlib.keysymdef.latin3',
+        'Xlib.keysymdef.latin4',
+        'Xlib.keysymdef.greek',
+        'Xlib.support.unix_connect',
+        'Xlib.ext.shape',
+        'Xlib.ext.xinerama',
+        'Xlib.ext.composite',
+        'Xlib.ext.randr',
+        'Xlib.ext.xfixes',
+        'Xlib.ext.security',
+        'Xlib.ext.xinput',
+        'pynput.keyboard._xorg',
+        'pynput.mouse._xorg',
+    ]
+elif target == 'Windows':
+    hiddenimports += [
+        'pynput.keyboard._win32',
+        'pynput.mouse._win32',
+    ]
+elif target == 'Darwin':
+    hiddenimports += [
+        'pynput.keyboard._darwin',
+        'pynput.mouse._darwin',
+    ]
 
 a = Analysis(['src/aw_watcher_input/__main__.py'],
              pathex=[],
