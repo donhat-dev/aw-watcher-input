@@ -10,6 +10,8 @@ import aw_client
 import click
 from aw_core import Event
 
+from .macos_permissions import ensure_macos_input_permissions
+
 try:
     import tomllib  # type: ignore[attr-defined]
 except ModuleNotFoundError:  # pragma: no cover
@@ -96,6 +98,7 @@ def main(testing: bool, debug: bool, config: Optional[str]):
     logger.debug("Log file: %s", _log_file_path())
     if sys.platform == "darwin":
         logger.info(_macos_input_permission_hint())
+        ensure_macos_input_permissions(log=logger)
 
     if IMPORT_ERROR:
         logger.exception("Dependency import failed: %s", IMPORT_ERROR)
